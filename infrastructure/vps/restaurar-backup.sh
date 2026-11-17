@@ -49,11 +49,13 @@ main() {
   git fetch origin || echo "AVISO: não deu para buscar o repositório; usando o que já está na pasta."
   git cat-file -e "$SHA^{commit}" 2>/dev/null || { echo "O commit $SHA não existe neste clone — nada foi alterado."; exit 1; }
 
+  # O .env vem antes do "down": numa pasta recém-clonada o compose nem lê o projeto sem ele.
+  [ -f .env ] && cp .env ".env.antes-da-restauracao-$(date +%Y%m%d-%H%M%S)"
+  cp "$BK/env.backup" .env
+  chmod 600 .env
   echo "=== Parando o sistema"
   docker compose down || true
   git checkout -q -B "restaurado-$(date +%Y%m%d-%H%M%S)" "$SHA"
-  cp "$BK/env.backup" .env
-  chmod 600 .env
 
   echo "=== Banco"
   docker compose up -d postgres
@@ -64,7 +66,12 @@ main() {
   gzip -dc "$BK/banco.sql.gz" | docker compose exec -T postgres psql -q -v ON_ERROR_STOP=1 -U whatsatendende -d whatsatendende >/dev/null
 
   echo "=== Imagens (build)"
-  docker compose build
+  # O Docker Hub limita downloads (429 Too Many Requests): tenta de novo antes de desistir.
+  for try in 1 2 3; do
+    docker compose build && break
+    [ "$try" = 3 ] && { echo "O build falhou 3 vezes. Banco e .env já restaurados; rode de novo este script."; exit 1; }
+    echo "Build falhou (tentativa $try de 3) — nova tentativa em 60 s"; sleep 60
+  done
 
   echo "=== Arquivos e sessões do WhatsApp"
   docker compose run --rm --no-deps -T --entrypoint sh api -c 'rm -rf /data/uploads/* /data/whatsapp-sessions/* && tar xzf - -C /data' < "$BK/arquivos.tar.gz"

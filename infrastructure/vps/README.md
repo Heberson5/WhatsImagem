@@ -153,13 +153,18 @@ Fica guardado num volume Docker próprio (`app_downloads`, veja
 `git pull` + rebuild seguinte, sem precisar reenviar o arquivo de novo.
 Só repita o `docker cp` acima se gerar uma versão nova do `.apk`.
 
-## WhatsUnivida — porta 8086, domínio e dados de demonstração
+## WhatsImagem — porta 8087, domínio e dados de demonstração
 
-Esta cópia publica o container `web` na porta **8086** do host
-(`docker-compose.yml`) e usa `WEB_APP_URL=https://whatsunivida.sauberlich.com.br`
-por padrão. Aponte o DNS de `whatsunivida.sauberlich.com.br` para a VPS e
+O WhatsImagem é uma cópia do WhatsUnivida que roda na mesma VPS, ao lado do
+WhatsAtendende (porta 8080) e do WhatsUnivida (porta 8086), na pasta
+`~/whatsimagem`. Os containers, o banco e os volumes são próprios (projeto Docker
+`whatsimagem`); só a IA local (`ia-local`) é compartilhada.
+
+Publica o container `web` na porta **8087** do host
+(`docker-compose.yml`) e usa `WEB_APP_URL=https://whatsimagem.sauberlich.com.br`
+por padrão. Aponte o DNS de `whatsimagem.sauberlich.com.br` para a VPS e
 configure o proxy do host (nginx/Caddy) para encaminhar o domínio para
-`http://127.0.0.1:8086`, incluindo os cabeçalhos de WebSocket (`Upgrade` e
+`http://127.0.0.1:8087`, incluindo os cabeçalhos de WebSocket (`Upgrade` e
 `Connection`) para o `/socket.io`.
 
 O seed (opção **[21]**, ou `docker compose exec api npx tsx prisma/seed.ts`)
@@ -176,3 +181,39 @@ as conexões de demonstração nunca são pareadas — conecte o WhatsApp real n
 conexão nova em **Configurações**. Para rodar o seed sem os dados de exemplo,
 use `SEED_DEMO=false`. Roda uma vez só: se a conexão de demonstração já
 existir, não cria nada de novo.
+
+## Backup completo para outro servidor (linha de comando)
+
+Além das opções do gerenciador e de **Configurações › Backup** (um `.tar.gz` baixado
+pelo navegador, restaurado na mesma versão do sistema), o repositório traz dois
+scripts que não dependem do Windows e servem para levar o sistema inteiro para
+**outro servidor**:
+
+```bash
+# Na VPS, dentro de qualquer pasta (o sistema continua no ar):
+bash ~/whatsimagem/infrastructure/vps/backup-completo.sh whatsimagem
+# ...e já copiando para outro servidor por SSH (confere o SHA256 lá):
+BACKUP_SSH_KEY=~/.ssh/chave-servidor-novo bash ~/whatsimagem/infrastructure/vps/backup-completo.sh \
+  whatsimagem ubuntu@IP-DO-SERVIDOR-NOVO:/home/ubuntu/backups-recebidos
+```
+
+O backup fica em `~/backups-completos/<pasta>/AAAAMMDD-HHMMSS` (ficam os 5 últimos;
+mude com `KEEP_BACKUPS=10`) com o dump do banco, os arquivos e as sessões do
+WhatsApp, o app Android, o `.env`, o commit do código e um `SHA256SUMS`. Um dump
+incompleto ou um arquivo corrompido faz o script parar com erro e apagar o backup
+incompleto. **O `.env` tem os segredos do sistema: guarde a pasta em local seguro.**
+
+No servidor novo (Docker, Docker Compose e git instalados — opções [13]/[14] do
+gerenciador — e acesso ao repositório no GitHub):
+
+```bash
+bash restaurar-backup.sh ~/backups-recebidos/whatsimagem/AAAAMMDD-HHMMSS whatsimagem
+```
+
+O script confere o SHA256, clona o código se a pasta não existir, volta o código
+para o **mesmo commit do backup**, restaura `.env`, banco, arquivos e sessões,
+reconstrói e só termina quando `/api/health` responde. Depois disso o deploy
+automático (ou `git checkout main && git pull` + rebuild) atualiza normalmente.
+Desligue o servidor antigo (`docker compose down`) **antes** de subir o novo: duas
+cópias no ar com as mesmas sessões do WhatsApp derrubam a conexão.
+Lembre de apontar o DNS e o proxy HTTPS do domínio para o servidor novo.
