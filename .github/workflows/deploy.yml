@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
 
 env:
-  VPS_PROJECT: whatsunivida
+  VPS_PROJECT: whatsimagem
   VPS_BRANCH: main
-  VPS_WEB_PORT: "8086"
+  VPS_WEB_PORT: "8087"
 
 # Um deploy por vez; um push novo espera o anterior terminar (nunca corta um deploy no meio).
 concurrency:
