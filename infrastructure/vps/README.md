@@ -160,6 +160,21 @@ WhatsAtendende (porta 8080) e do WhatsUnivida (porta 8086), na pasta
 `~/whatsimagem`. Os containers, o banco e os volumes são próprios (projeto Docker
 `whatsimagem`); só a IA local (`ia-local`) é compartilhada.
 
+### Instalação automática
+
+Não precisa do gerenciador para instalar: o primeiro **Deploy VPS** (push na `main`
+ou **Actions › Deploy VPS › Run workflow**) encontra a VPS sem a pasta `~/whatsimagem` e
+sozinho clona o repositório (com o token temporário do próprio job — o repositório é
+privado e nenhuma senha fica na VPS), cria o `.env` com segredos aleatórios e
+`WHATSAPP_PROVIDER=baileys`, sobe o sistema, cria o **primeiro administrador** e cadastra
+`whatsimagem.sauberlich.com.br` no proxy da VPS (nginx + certbot, ou Caddy) com HTTPS —
+sem tocar em nenhum site que já exista. O login e a senha do administrador aparecem no
+fim do log do job (**PRIMEIRO ACESSO**) e ficam em `~/whatsimagem/CREDENCIAIS-INICIAIS.txt`.
+Se o DNS ainda não apontar para a VPS, o certificado HTTPS é tentado de novo a cada deploy.
+
+O deploy precisa dos mesmos três segredos do WhatsUnivida (`VPS_HOST`, `VPS_USER`,
+`VPS_SSH_KEY`) em **Settings › Secrets and variables › Actions** deste repositório.
+
 Publica o container `web` na porta **8087** do host
 (`docker-compose.yml`) e usa `WEB_APP_URL=https://whatsimagem.sauberlich.com.br`
 por padrão. Aponte o DNS de `whatsimagem.sauberlich.com.br` para a VPS e
